@@ -5,7 +5,10 @@ from random import randint, choice
 from collections import deque
 
 class Drone:
-    
+
+    cardinal = ["NORTH", "SOUTH", "EAST", "WEST"]
+    cardinalIndex = {"NORTH":0, "SOUTH":1, "EAST":2, "WEST":3}
+    turnMath = {"right": +2, "left": -1, "aboutFace": +1}
 
     def __init__(self):
         self.stepCount = 0
@@ -43,6 +46,12 @@ class Drone:
             self.instructions.appendleft((upDown, "SOUTH"))
         self.beam = True
         self.stepCount, self.direction = self.getInstructions()
+
+    def makeTurn(self, direction, currentDirection):
+        indx = Drone.cardinalIndex[currentDirection]
+        turnIndx = Drone.turnMath[direction]
+        return Drone.cardinal[(indx + turnIndx)%4]
+        
         
     def move(self, context):
 
@@ -72,57 +81,18 @@ class Drone:
             self.currStep = self.stepCount
         elif self.stepCount == 0:
             self.currStep = 0
-            if self.direction == "SOUTH":
-                return "NORTH"
-            elif self.direction == "EAST":
-                return "WEST"
-            elif self.direction == "WEST":
-                return "EAST"
-            else:
-                return "SOUTH"
-        if self.beam == False:
-            if self.direction == 'NORTH':
-                if context.north == '*':
-                    self.mined += 1
-                    return self.direction
-                elif context.north == '#':
-                    self.stepCount, self.direction = self.getInstructions()
-                    self.stepCount -= 1
-                    return "EAST"
-                self.stepCount -= 1
-                return self.direction
-            elif self.direction == 'SOUTH':
-                if context.south == '*':
-                    self.mined += 1
-                    return self.direction
-                elif context.south == '#':
-                    self.stepCount, self.direction = self.getInstructions()
-                    self.stepCount -= 1
-                    return "WEST"
-                self.stepCount -= 1
-                return self.direction
-            elif self.direction == 'EAST':
-                if context.east == '*':
-                    self.mined += 1
-                    return self.direction
-                elif context.east == '#':
-                    self.stepCount, self.direction = self.getInstructions()
-                    self.stepCount -= 1
-                    return "SOUTH"
-                self.stepCount -= 1
-                return self.direction
-            else:
-                if context.west == '*':
-                    self.mined += 1
-                    return self.direction
-                elif context.west == '#':
-                    self.stepCount, self.direction = self.getInstructions()
-                    self.stepCount -= 1
-                    return "NORTH"
-                self.stepCount -= 1
-                return self.direction
-            if context.x | context.y < 3:
-                stripSearch(context)
+            self.makeTurn("aboutFace", self.direction)
+
+
+        if getattr(context,self.direction.lower()) == "*":
+            self.mined += 1
+            return self.direction
+        if getattr(context,self.direction.lower()) == "#":
+            self.stepCount, self.direction = self.getInstructions()
+            self.stepCount -= 1
+            self.makeTurn("right", self.direction)
+        self.stepCount -= 1
+        return self.direction
 
 
 class Overlord:
