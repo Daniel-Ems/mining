@@ -95,25 +95,17 @@ class Drone:
 
         if self.headBack == True:
             if context.x == self.dropX and context.y == self.dropY:
+                print("AT LANDING ZONE")
                 self.beam = 1
                 return "CENTER"
-            if self.stepCount == 0 and self.home == 0:
-                self.home += 1
-                self.getInstructions()
-                print("END of first return instructions", self.stepCount, self.direction)
-            elif self.stepCount == 0 and self.home == 1:
-                if context.x == self.dropX and context.y == self.dropY:
-                    print("AT LANDING ZONE")
-                    self.beam = 1
-                    return "CENTER"
-                else:
-                    self.home = 0
-                    self.returnInstructions(context.x, context.y)
-                    print("NOT AT LANDING YET", self.stepCount, self.direction)
+            else:
+                self.home = 0
+                self.returnInstructions(context.x, context.y)
+                print("NOT AT LANDING YET", self.stepCount, self.direction)
             self.stepCount -= 1
             return self.direction
 
-        if self.mined > 20:
+        if self.mined > 30:
             print("MINE CAPACITY")
             if context.x == self.dropX and context.y == self.dropY:
                 self.beam = 1
