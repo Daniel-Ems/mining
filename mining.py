@@ -6,16 +6,18 @@ from collections import deque
 
 class Drone:
 
-    cardinal = ["NORTH", "SOUTH", "EAST", "WEST"]
-    cardinalIndex = {"NORTH":0, "SOUTH":1, "EAST":2, "WEST":3}
-    turnMath = {"right": +2, "left": -1, "aboutFace": +1}
+    cardinal = ["NORTH", "EAST", "SOUTH", "WEST"]
+    cardinalIndex = {"NORTH":0, "EAST":1, "SOUTH":2, "WEST":3}
+    turnMath = {"right": 1, "left": 3, "aboutFace": 2}
 
     def __init__(self):
         self.stepCount = 0
         self.direction = "NONE"
         self.instructions = deque([(2,"NORTH"), (2, "EAST"), (5, "SOUTH"), (5, "WEST"),
                     (7, "NORTH"),(7, "EAST"), (10, "SOUTH"), (10, "WEST"), (13, "NORTH"),
-                    (13, "EAST"), (15, "SOUTH"), (15, "WEST"), (18, "NORTH"), (18, "EAST")])
+                    (13, "EAST"), (15, "SOUTH"), (15, "WEST"), (18, "NORTH"), (18, "EAST"),
+                    (2, "SOUTH"), (2, "WEST"), (5, "NORTH")])
+        self.returnPath = deque([])
         self.currStep = 0
         self.nBor = 0 
         self.sBor = 0
@@ -23,76 +25,122 @@ class Drone:
         self.wBor = 0
         self.dropX = -1
         self.dropY = -1
-        self.beam = False
+        self.headBack = False
         self.mined = 0
         self.home = 0
-        self.good = 0
-    def getInstructions(self):
+        self.beam = 0
+        self.getInstructions()
 
-        return self.instructions.popleft()    
+    """ pops the new instructions from the deque """
+    def getInstructions(self):
+        if self.headBack == True:
+            self.stepCount, self.direction = self.returnPath.popleft()
+            print("RETURN COORDINATES", self.stepCount, self.direction)
+        else:
+            self.stepCount, self.direction = self.instructions.popleft()    
     
+    """ navigates the drone back to the landing zone """
     def returnInstructions(self, x, y):
+        print("Return Instructions")
         sideways = self.dropX - x
         upDown = self.dropY - y
+        print("X{},Y{}".format(sideways, upDown))
         if sideways > 0:
-            self.instructions.appendleft((sideways, "EAST"))
-        else:
+            self.returnPath.appendleft((sideways, "EAST"))
+        if sideways < 0:
             sideways *= -1
-            self.instructions.appendleft((sideways, "WEST"))
+            self.returnPath.appendleft((sideways, "WEST"))
         if upDown > 0:
-            self.instructions.appendleft((upDown, "NORTH"))
-        else:
+            self.returnPath.appendleft((upDown, "NORTH"))
+        if upDown < 0:
             upDown *= -1 
-            self.instructions.appendleft((upDown, "SOUTH"))
-        self.beam = True
-        self.stepCount, self.direction = self.getInstructions()
+            self.returnPath.appendleft((upDown, "SOUTH"))
+        self.headBack = True
+        self.getInstructions()
 
-    def makeTurn(self, direction, currentDirection):
-        indx = Drone.cardinalIndex[currentDirection]
+    """ This is the 'detour' method """ 
+    def makeTurn(self, context, direction):
+        indx = Drone.cardinalIndex[self.direction]
+        index = Drone.turnMath[direction]
+        print("MAKE TURN FACING:", self.direction, Drone.cardinal[(indx + index)%4])
+        self.getInstructions()
+        return Drone.cardinal[(indx + index)%4]
+        
+
+    def mineCheck(self, context):
+        indx = Drone.cardinalIndex[self.direction]
+        if getattr(context,self.direction.lower()) == "*":
+            return self.direction
+        for cardinal, index in Drone.turnMath.items():
+            if getattr(context,Drone.cardinal[(indx + index) %4].lower()) == "*":
+                return Drone.cardinal[(indx + index)%4]
+        return "NONE"
+
+    def hazard(self, context, direction):
+        retVal = False
+        indx = Drone.cardinalIndex[self.direction]
         turnIndx = Drone.turnMath[direction]
-        return Drone.cardinal[(indx + turnIndx)%4]
-        
-        
+        if getattr(context,Drone.cardinal[(indx + turnIndx) %4].lower()) == "#":
+            retVal = True
+        if getattr(context, Drone.cardinal[(indx + turnIndx) %4].lower()) == "Z":
+            retVal = True
+        return retVal
+
     def move(self, context):
 
-        if self.mined >= 10 and self.beam == False:
-            return self.returnInstructions(context.x, context.y)
+        if self.dropX and self.dropY == -1:
+            self.dropX = context.x
+            self.dropY = context.y
+            print(self.dropX, self.dropY)
 
-        if self.beam == True:
+        if self.headBack == True:
+            if context.x == self.dropX and context.y == self.dropY:
+                self.beam = 1
+                return "CENTER"
             if self.stepCount == 0 and self.home == 0:
                 self.home += 1
-                self.stepCount, self.direction = self.getInstructions()
-            if self.stepCount == 0 and self.home == 1:
-                if context.x != self.dropX | context.y != self.dropY:
+                self.getInstructions()
+                print("END of first return instructions", self.stepCount, self.direction)
+            elif self.stepCount == 0 and self.home == 1:
+                if context.x == self.dropX and context.y == self.dropY:
+                    print("AT LANDING ZONE")
+                    self.beam = 1
+                    return "CENTER"
+                else:
                     self.home = 0
                     self.returnInstructions(context.x, context.y)
-                else:
-                    self.good = 1
-                    return "CENTER"
+                    print("NOT AT LANDING YET", self.stepCount, self.direction)
             self.stepCount -= 1
             return self.direction
 
-        if self.dropX and self.dropY == -1:
-            self.dropX = (context.x)
-            self.dropY = (context.y)
-
-        if self.stepCount == 0 and self.currStep != 5 and self.currStep != 13:
-            self.stepCount, self.direction = self.getInstructions()
-            self.currStep = self.stepCount
-        elif self.stepCount == 0:
-            self.currStep = 0
-            self.makeTurn("aboutFace", self.direction)
-
-
-        if getattr(context,self.direction.lower()) == "*":
-            self.mined += 1
-            return self.direction
-        if getattr(context,self.direction.lower()) == "#":
-            self.stepCount, self.direction = self.getInstructions()
+        if self.mined > 20:
+            print("MINE CAPACITY")
+            if context.x == self.dropX and context.y == self.dropY:
+                self.beam = 1
+                self.headBack = True
+                return "CENTER"
+            self.returnInstructions(context.x, context.y)
             self.stepCount -= 1
-            self.makeTurn("right", self.direction)
-        self.stepCount -= 1
-        return self.direction
+            return self.direction
+
+        if self.headBack == False:
+            
+
+            mine = self.mineCheck(context)
+            print("mine direction", mine)
+            print(self.mined)
+            if mine != "NONE":
+                self.mined += 1
+                return mine
+            if getattr(context,self.direction.lower()) == "#":
+                return self.makeTurn(context,"right")
+            if getattr(context,self.direction.lower()) == "Z":
+                return self.makeTurn(context,"right")
+
+            if self.stepCount == 0:
+                self.getInstructions()
+            self.stepCount -= 1
+            return self.direction
 
 
 class Overlord:
@@ -104,6 +152,7 @@ class Overlord:
         self.downRange = []
         self.currDrone = -1
         self.numDeployed = 0
+        self.returned = []
 
         for _ in range(6):
             z = Drone()
@@ -129,12 +178,14 @@ class Overlord:
                     return 'DEPLOY {} {}'.format(self.downRange[self.currDrone],
                                          mapped)
          while a <= len(self.downRange)-1:
-            if self.zerg[self.downRange[a]].good == 1:
+            if self.zerg[self.downRange[a]].beam == 1:
                 x = self.downRange.pop(a)
+                self.returned.append(x)
                 return 'RETURN {}'.format(x)
-            print("Status of zerg", self.downRange[a], "Good =", self.zerg[self.downRange[a]].good)
             a += 1
-         return "FUCK OFF"
+
+         print("returned", self.returned)
+         return "NOT YET"
          
         
             
