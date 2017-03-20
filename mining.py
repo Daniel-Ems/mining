@@ -29,7 +29,10 @@ class Drone:
         self.mined = 0
         self.home = 0
         self.beam = 0
+        self.borderPatrol = False
         self.getInstructions()
+        self.startSearch = "NONE"
+        self.barrier = "NONE"
 
     """ pops the new instructions from the deque """
     def getInstructions(self):
@@ -39,7 +42,7 @@ class Drone:
         else:
             self.stepCount, self.direction = self.instructions.popleft()    
     
-    """ navigates the drone back to the landing zone """
+    """ calculates the path for the drone to head go back to the landing zone """
     def returnInstructions(self, x, y):
         print("Return Instructions")
         sideways = self.dropX - x
@@ -63,10 +66,9 @@ class Drone:
         indx = Drone.cardinalIndex[self.direction]
         index = Drone.turnMath[direction]
         print("MAKE TURN FACING:", self.direction, Drone.cardinal[(indx + index)%4])
-        self.getInstructions()
         return Drone.cardinal[(indx + index)%4]
         
-
+    """ this checks every direction for mines """
     def mineCheck(self, context):
         indx = Drone.cardinalIndex[self.direction]
         if getattr(context,self.direction.lower()) == "*":
@@ -76,6 +78,8 @@ class Drone:
                 return Drone.cardinal[(indx + index)%4]
         return "NONE"
 
+    """ not being used, this function is going to try and check your """
+    """ your surroundings for obstacles and move accordingly """ 
     def hazard(self, context, direction):
         retVal = False
         indx = Drone.cardinalIndex[self.direction]
@@ -86,13 +90,69 @@ class Drone:
             retVal = True
         return retVal
 
+    def perimeterSearch(self, context):
+        
+        if getattr(context, self.direction.lower()) in "#~Z":
+            if self.barrier == "#":
+                if self.startSearch == "NONE":
+                    self.startSearch = (context.x, context.y)
+                    print("Start Search", self.startSearch)
+            mine = self.mineCheck(context)
+            #debug Statement
+            print("mine direction", mine)
+            #debug statement
+            print(self.mined)
+            if mine != "NONE":
+                self.mined += 1
+                return mine
+
+            self.barrier = getattr(context, self.direction.lower())
+            self.direction = self.makeTurn(context,"right")
+            return self.direction
+
+        if self.startSearch != "NONE":
+            mine = self.mineCheck(context)
+            #debug Statement
+            print("mine direction", mine)
+            #debug statement
+            print(self.mined)
+            if mine != "NONE":
+                self.mined += 1
+                return mine
+            left = self.makeTurn(context, "left")
+            if getattr(context,left.lower()) != self.barrier:
+                self.direction = self.makeTurn(context, "left")
+        return self.direction
+        
+        
+
     def move(self, context):
 
+        """ set the drop location """
         if self.dropX and self.dropY == -1:
             self.dropX = context.x
             self.dropY = context.y
+            if self.dropX > self.dropY:
+                self.direction = "SOUTH"
+            else:
+                self.direction = "WEST"
+            self.borderPatrol = True
+            #Debug statement
             print(self.dropX, self.dropY)
+            return self.perimeterSearch(context)
+            
 
+        if self.borderPatrol == True:
+            if (context.x, context.y) == self.startSearch:
+                print("Start Found")
+                self.getInstructions()
+                self.borderPatrol = False
+                return self.direction
+            else:
+                return self.perimeterSearch(context)
+
+
+        """ if headBack is set, return to the landing zone """
         if self.headBack == True:
             if context.x == self.dropX and context.y == self.dropY:
                 print("AT LANDING ZONE")
@@ -101,11 +161,14 @@ class Drone:
             else:
                 self.home = 0
                 self.returnInstructions(context.x, context.y)
+                #Debug Statement
                 print("NOT AT LANDING YET", self.stepCount, self.direction)
             self.stepCount -= 1
             return self.direction
 
+        """ check to see if they collected a certain number of minerals """
         if self.mined > 30:
+            #Debug Statement
             print("MINE CAPACITY")
             if context.x == self.dropX and context.y == self.dropY:
                 self.beam = 1
@@ -115,20 +178,22 @@ class Drone:
             self.stepCount -= 1
             return self.direction
 
+        """ while return is not set continue searching """ 
         if self.headBack == False:
-            
-
             mine = self.mineCheck(context)
+            #debug Statement
             print("mine direction", mine)
+            #debug statement
             print(self.mined)
             if mine != "NONE":
                 self.mined += 1
                 return mine
             if getattr(context,self.direction.lower()) == "#":
-                return self.makeTurn(context,"right")
+                self.direction = self.makeTurn(context,"right")
+                self.getInstructions()
             if getattr(context,self.direction.lower()) == "Z":
-                return self.makeTurn(context,"right")
-
+                self.direction = self.makeTurn(context,"right")
+                self.getInstructions()
             if self.stepCount == 0:
                 self.getInstructions()
             self.stepCount -= 1
@@ -175,9 +240,9 @@ class Overlord:
                 self.returned.append(x)
                 return 'RETURN {}'.format(x)
             a += 1
-
+         #debug Statement
          print("returned", self.returned)
-         return "NOT YET"
+         return "NONE YET"
          
         
             
