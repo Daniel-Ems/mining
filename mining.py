@@ -75,8 +75,9 @@ class Drone:
             return self.direction
         for cardinal, index in Drone.turnMath.items():
             if getattr(context,Drone.cardinal[(indx + index) %4].lower()) == "*":
+                self.mined += 1
                 return Drone.cardinal[(indx + index)%4]
-        return "NONE"
+        return self.direction
 
     """ not being used, this function is going to try and check your """
     """ your surroundings for obstacles and move accordingly """ 
@@ -90,38 +91,22 @@ class Drone:
             retVal = True
         return retVal
 
-    def perimeterSearch(self, context):
-        
+    def perimeterSearch(self, context): 
         if getattr(context, self.direction.lower()) in "#~Z":
             if self.barrier == "#":
                 if self.startSearch == "NONE":
                     self.startSearch = (context.x, context.y)
                     print("Start Search", self.startSearch)
-            mine = self.mineCheck(context)
-            #debug Statement
-            print("mine direction", mine)
-            #debug statement
-            print(self.mined)
-            if mine != "NONE":
-                self.mined += 1
-                return mine
-
             self.barrier = getattr(context, self.direction.lower())
             self.direction = self.makeTurn(context,"right")
+            self.direction = self.mineCheck(context)
             return self.direction
 
         if self.startSearch != "NONE":
-            mine = self.mineCheck(context)
-            #debug Statement
-            print("mine direction", mine)
-            #debug statement
-            print(self.mined)
-            if mine != "NONE":
-                self.mined += 1
-                return mine
             left = self.makeTurn(context, "left")
             if getattr(context,left.lower()) != self.barrier:
                 self.direction = self.makeTurn(context, "left")
+        self.direction = self.mineCheck(context)
         return self.direction
         
         
@@ -180,14 +165,6 @@ class Drone:
 
         """ while return is not set continue searching """ 
         if self.headBack == False:
-            mine = self.mineCheck(context)
-            #debug Statement
-            print("mine direction", mine)
-            #debug statement
-            print(self.mined)
-            if mine != "NONE":
-                self.mined += 1
-                return mine
             if getattr(context,self.direction.lower()) == "#":
                 self.direction = self.makeTurn(context,"right")
                 self.getInstructions()
@@ -196,6 +173,7 @@ class Drone:
                 self.getInstructions()
             if self.stepCount == 0:
                 self.getInstructions()
+            self.direction = self.mineCheck(context)
             self.stepCount -= 1
             return self.direction
 
