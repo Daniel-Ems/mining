@@ -32,7 +32,12 @@ class Drone:
         self.borderPatrol = False
         self.getInstructions()
         self.startSearch = "NONE"
-        self.barrier = "NONE"
+        self.rightTurns = 0
+        self.leftTurns = 0
+        self.plane = 0
+        self.barrier = 0
+        self.current = "NONE"
+        self.detour = False
 
     """ pops the new instructions from the deque """
     def getInstructions(self):
@@ -50,12 +55,12 @@ class Drone:
         print("X{},Y{}".format(sideways, upDown))
         if sideways > 0:
             self.returnPath.appendleft((sideways, "EAST"))
-        if sideways < 0:
+        elif sideways < 0:
             sideways *= -1
             self.returnPath.appendleft((sideways, "WEST"))
         if upDown > 0:
             self.returnPath.appendleft((upDown, "NORTH"))
-        if upDown < 0:
+        elif upDown < 0:
             upDown *= -1 
             self.returnPath.appendleft((upDown, "SOUTH"))
         self.headBack = True
@@ -70,48 +75,80 @@ class Drone:
         
     """ this checks every direction for mines """
     def mineCheck(self, context):
-        indx = Drone.cardinalIndex[self.direction]
-        if getattr(context,self.direction.lower()) == "*":
-            return self.direction
-        for cardinal, index in Drone.turnMath.items():
-            if getattr(context,Drone.cardinal[(indx + index) %4].lower()) == "*":
+
+        for items in Drone.cardinalIndex:
+            if getattr(context,items.lower()) == "*":
                 self.mined += 1
-                return Drone.cardinal[(indx + index)%4]
-        return self.direction
+                return items
+        return "NONE"
 
-    """ not being used, this function is going to try and check your """
-    """ your surroundings for obstacles and move accordingly """ 
-    def hazard(self, context, direction):
-        retVal = False
-        indx = Drone.cardinalIndex[self.direction]
-        turnIndx = Drone.turnMath[direction]
-        if getattr(context,Drone.cardinal[(indx + turnIndx) %4].lower()) == "#":
-            retVal = True
-        if getattr(context, Drone.cardinal[(indx + turnIndx) %4].lower()) == "Z":
-            retVal = True
-        return retVal
 
-    def perimeterSearch(self, context): 
-        if getattr(context, self.direction.lower()) in "#~Z":
-            if self.barrier == "#":
-                if self.startSearch == "NONE":
-                    self.startSearch = (context.x, context.y)
-                    print("Start Search", self.startSearch)
-            self.barrier = getattr(context, self.direction.lower())
-            self.direction = self.makeTurn(context,"right")
-            self.direction = self.mineCheck(context)
+    def rightTurn(self, context):
+        right = self.makeTurn(context, "right")
+        self.rightTurns += 1
+        if getattr(context, right.lower()) in "#~Z":
+            right = self.makeTurn(context, "aboutFace")
+            self.rightTurns += 1
+        return right
+
+    def leftTurn(self, context):
+        left = self.makeTurn(context, "left")
+        if getattr(context,left.lower()) not in "#~Z":
+            self.leftTurns += 1
+            return left
+        return "NONE"
+
+    def setStart(self, context):
+        if self.startSearch == "NONE":
+            if context.x | context.y == 1:
+                self.startSearch = context.x, context.y
+
+
+    """ LEFT OFF: You were planning on using the x and y coordinates to """
+    """ determine if you have gone around an obstacle or around the whole """
+    """ map, this is being done in the left turn portion of the this func """
+    """ your adding them to a deque from the left. You will compare the """
+    """ context.x and y with the zeroth element. If they are equal, you """
+    """ have gone around the entire map, if x is larger or less than """
+    """ (depending on the direction you are moving, then you will have """
+    """ gone around an obstacle, and will want to prevent going in loops, or """
+    """ potentially back to the beginning. """ 
+
+    def perimeterSearch(self, context):
+        if self.leftTurns and self.rightTurns == 0:
+            if getattr(context, self.direction.lower()) in "#~Z":
+                right = self.rightTurn(context)
+                return right
+            else:
+                return self.direction
+
+        elif self.rightTurns >= self.leftTurns:
+            if getattr(context, self.direction.lower()) in "#~Z":
+                left = self.leftTurn(context)
+                if left != "NONE":
+                    self.direction = left
+                    return self.direction
+                else:
+                    self.direction = self.rightTurn(context)
+                    return self.direction
+            else:
+                left = self.leftTurn(context)
+                if left != "NONE":
+                    self.direction = left
+                    return self.direction
+                return self.direction
+
+        elif self.leftTurns > self.rightTurns:
+            self.direction = self.rightTurn(context)
             return self.direction
 
-        if self.startSearch != "NONE":
-            left = self.makeTurn(context, "left")
-            if getattr(context,left.lower()) != self.barrier:
-                self.direction = self.makeTurn(context, "left")
-        self.direction = self.mineCheck(context)
-        return self.direction
-        
-        
+
 
     def move(self, context):
+        
+        mine = self.mineCheck(context)
+        if mine != "NONE":
+            return mine
 
         """ set the drop location """
         if self.dropX and self.dropY == -1:
@@ -124,15 +161,18 @@ class Drone:
             self.borderPatrol = True
             #Debug statement
             print(self.dropX, self.dropY)
-            return self.perimeterSearch(context)
-            
 
         if self.borderPatrol == True:
-            if (context.x, context.y) == self.startSearch:
+            if self.startSearch == "NONE":
+                if getattr(context, self.direction.lower()) == "#":
+                    self.setStart(context)
+                return self.perimeterSearch(context)
+            elif (context.x, context.y) == self.startSearch and self.rightTurns >= 4:
                 print("Start Found")
+                self.leftTurns = self.rightTurns = 0
                 self.getInstructions()
                 self.borderPatrol = False
-                return self.direction
+                return self.rightTurn(context)
             else:
                 return self.perimeterSearch(context)
 
@@ -152,7 +192,7 @@ class Drone:
             return self.direction
 
         """ check to see if they collected a certain number of minerals """
-        if self.mined > 30:
+        if self.mined >= 15:
             #Debug Statement
             print("MINE CAPACITY")
             if context.x == self.dropX and context.y == self.dropY:
@@ -163,19 +203,21 @@ class Drone:
             self.stepCount -= 1
             return self.direction
 
+        if self.detour == True:
+            self.direction = self.perimeterSearch(context)
+        
         """ while return is not set continue searching """ 
-        if self.headBack == False:
-            if getattr(context,self.direction.lower()) == "#":
-                self.direction = self.makeTurn(context,"right")
-                self.getInstructions()
-            if getattr(context,self.direction.lower()) == "Z":
-                self.direction = self.makeTurn(context,"right")
-                self.getInstructions()
+        if self.headBack == False and self.detour == False:
+            if getattr(context,self.direction.lower()) in "#~Z":
+                self.detour = True
+                self.direction = self.perimeterSearch(context)
             if self.stepCount == 0:
                 self.getInstructions()
-            self.direction = self.mineCheck(context)
-            self.stepCount -= 1
-            return self.direction
+
+        
+
+        self.stepCount -= 1
+        return self.direction
 
 
 class Overlord:
