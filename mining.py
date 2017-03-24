@@ -3,7 +3,7 @@
 
 from random import randint, choice
 from collections import deque
-
+from time import sleep
 class Drone:
 
     cardinal = ["NORTH", "EAST", "SOUTH", "WEST"]
@@ -20,24 +20,32 @@ class Drone:
         self.returnPath = deque([])
         self.currStep = 0
         self.nBor = 0 
-        self.sBor = 0
+        self.sBor = 1
         self.eBor = 0
-        self.wBor = 0
+        self.wBor = 1
         self.dropX = -1
         self.dropY = -1
         self.headBack = False
         self.mined = 0
         self.home = 0
         self.beam = 0
-        self.borderPatrol = False
+        self.borderPatrol = True
         self.getInstructions()
-        self.startSearch = "NONE"
+        self.startSearch = False
         self.rightTurns = 0
         self.leftTurns = 0
         self.plane = 0
         self.barrier = 0
         self.current = "NONE"
         self.detour = False
+        self.zergImpact = False
+        self.startX = 0
+        self.startY = 0
+        self.lead = False
+
+    def setRole(self, position):
+        if position == "lead":
+            self.lead = True
 
     """ pops the new instructions from the deque """
     def getInstructions(self):
@@ -76,7 +84,7 @@ class Drone:
     """ this checks every direction for mines """
     def mineCheck(self, context):
 
-        for items in Drone.cardinalIndex:
+        for items in Drone.cardinal:
             if getattr(context,items.lower()) == "*":
                 self.mined += 1
                 return items
@@ -87,6 +95,8 @@ class Drone:
         right = self.makeTurn(context, "right")
         self.rightTurns += 1
         if getattr(context, right.lower()) in "#~Z":
+            if getattr(context,right.lower()) == "Z":
+                self.zergImpact == True
             right = self.makeTurn(context, "aboutFace")
             self.rightTurns += 1
         return right
@@ -94,88 +104,139 @@ class Drone:
     def leftTurn(self, context):
         left = self.makeTurn(context, "left")
         if getattr(context,left.lower()) not in "#~Z":
+            if self.zergImpact == True:
+                self.leftTurns = self.rightTurns = 0
+                self.zergImpact = False
+                return left
             self.leftTurns += 1
             return left
         return "NONE"
 
     def setStart(self, context):
-        if self.startSearch == "NONE":
-            if context.x | context.y == 1:
-                self.startSearch = context.x, context.y
+        if getattr(context, self.direction.lower()) == "#":      
+            if context.x  == 1 or context.y == 1:
+                self.startX = context.x
+                self.startY = context.y
+                self.startSearch = True
 
-
-    """ LEFT OFF: You were planning on using the x and y coordinates to """
-    """ determine if you have gone around an obstacle or around the whole """
-    """ map, this is being done in the left turn portion of the this func """
-    """ your adding them to a deque from the left. You will compare the """
-    """ context.x and y with the zeroth element. If they are equal, you """
-    """ have gone around the entire map, if x is larger or less than """
-    """ (depending on the direction you are moving, then you will have """
-    """ gone around an obstacle, and will want to prevent going in loops, or """
-    """ potentially back to the beginning. """ 
-
+    """ used to move around obstacles """
     def perimeterSearch(self, context):
-        if self.leftTurns and self.rightTurns == 0:
+        """ if you have not moved right, continue straight until """
+        """ you hit a wall """
+        if self.leftTurns == 0 and self.rightTurns == 0:
             if getattr(context, self.direction.lower()) in "#~Z":
-                right = self.rightTurn(context)
-                return right
+                if getattr(context, self.direction.lower()) == "Z":
+                    self.zergImpact == True
+                self.direction = self.rightTurn(context)
+                return self.direction
             else:
                 return self.direction
-
+        #""" if you have moved right more or the same as left """
         elif self.rightTurns >= self.leftTurns:
-            if getattr(context, self.direction.lower()) in "#~Z":
-                left = self.leftTurn(context)
-                if left != "NONE":
-                    self.direction = left
-                    return self.direction
-                else:
-                    self.direction = self.rightTurn(context)
-                    return self.direction
+            #""" Check to your left and make sure that it is still a wall """
+            left = self.leftTurn(context)
+            #""" if there is nothing to your left, move left """
+            if left != "NONE":
+                self.direction = left
+                return self.direction
+            #""" if you run into a wall, and there is something to your"""
+            #""" left, turn right """
+            elif getattr(context, self.direction.lower()) in "#~Z":
+                if getattr(context, self.direction.lower()) == "Z":
+                    self.zergImpact = True
+                self.direction = self.rightTurn(context)
+                return self.direction
             else:
-                left = self.leftTurn(context)
-                if left != "NONE":
-                    self.direction = left
-                    return self.direction
                 return self.direction
 
         elif self.leftTurns > self.rightTurns:
             self.direction = self.rightTurn(context)
+            self.leftTurns = self.rightTurns = 0
+            self.detour = False
+            return self.direction
+        else:
             return self.direction
 
+    def innerSearch(self, context):
+        if self.leftTurns == 0 and self.rightTurns == 0:
+            if getattr(context, self.direction.lower()) in "#~Z":
+                self.detour == True
+                if getattr(context, self.direction.lower()) == "Z":
+                    self.zergImpact = True
+                self.direction = self.rightTurn(context)
 
+        elif self.rightTurns > self.leftTurns:
+            left = self.leftTurn(context)
+            if left != "NONE":
+                self.direction = left
+            elif getattr(context, self.direction.lower()) in "#~Z":
+                if getattr(context, self.direction.lower()) == "Z":
+                    self.zergImpact = True
+                self.direction = self.rightTurn(context)
+
+
+        elif self.rightTurns == self.leftTurns:
+            left = self.leftTurn(context)
+            if left != "NONE":
+                self.direction = left
+            elif getattr(context, self.direction.lower()) in "#~Z":
+                if getattr(context, self.direction.lower()) == "Z":
+                    self.zergImpact = True
+                self.direction = self.rightTurn(context)
+
+
+        elif self.leftTurns > self.rightTurns:
+            self.direction = self.rightTurn(context)
+            self.detour = False
+            self.rightTurns = 0
+            self.leftTurns = 0
+        
+        return self.direction
 
     def move(self, context):
-        
         mine = self.mineCheck(context)
         if mine != "NONE":
             return mine
 
         """ set the drop location """
-        if self.dropX and self.dropY == -1:
+        if self.dropX == -1 and self.dropY == -1:
             self.dropX = context.x
             self.dropY = context.y
             if self.dropX > self.dropY:
                 self.direction = "SOUTH"
             else:
                 self.direction = "WEST"
-            self.borderPatrol = True
             #Debug statement
             print(self.dropX, self.dropY)
 
         if self.borderPatrol == True:
-            if self.startSearch == "NONE":
-                if getattr(context, self.direction.lower()) == "#":
-                    self.setStart(context)
-                return self.perimeterSearch(context)
-            elif (context.x, context.y) == self.startSearch and self.rightTurns >= 4:
-                print("Start Found")
-                self.leftTurns = self.rightTurns = 0
-                self.getInstructions()
-                self.borderPatrol = False
-                return self.rightTurn(context)
-            else:
-                return self.perimeterSearch(context)
+            
+            if self.direction == "NORTH":
+                if context.y > self.nBor:
+                    self.nBor = context.y
+            if self.direction == "EAST":
+                if context.x > self.eBor:
+                    self.eBor = context.x
 
+            if self.startSearch == False:
+                self.setStart(context)
+                return self.perimeterSearch(context)
+            
+            if self.startSearch == True:
+                xDistance = context.x - self.startX
+                yDistance = context.y - self.startY
+                if  xDistance == 0 and yDistance == 0:
+                    #if xDistance >= 0 and yDistance >= 0:
+                     if self.rightTurns >= 4:
+                        print("Start Found")
+                        sleep(5)
+                        self.leftTurns = self.rightTurns = 0
+                        self.borderPatrol = False
+                        return self.direction
+
+            return self.perimeterSearch(context)
+
+        
 
         """ if headBack is set, return to the landing zone """
         if self.headBack == True:
@@ -192,7 +253,7 @@ class Drone:
             return self.direction
 
         """ check to see if they collected a certain number of minerals """
-        if self.mined >= 15:
+        if self.mined >= 45:
             #Debug Statement
             print("MINE CAPACITY")
             if context.x == self.dropX and context.y == self.dropY:
@@ -203,21 +264,36 @@ class Drone:
             self.stepCount -= 1
             return self.direction
 
-        if self.detour == True:
-            self.direction = self.perimeterSearch(context)
-        
-        """ while return is not set continue searching """ 
-        if self.headBack == False and self.detour == False:
-            if getattr(context,self.direction.lower()) in "#~Z":
-                self.detour = True
-                self.direction = self.perimeterSearch(context)
-            if self.stepCount == 0:
-                self.getInstructions()
+        if (self.nBor + self.eBor + self.wBor + self.sBor) / 4 <= 3:
+            self.returnInstructions(context.x, context.y)
+            self.stepCount -= 1
+            return self.direction
 
-        
-
-        self.stepCount -= 1
-        return self.direction
+        if self.borderPatrol == False and self.headBack == False:
+            #self.innerSearch(context)
+            if self.detour == False:
+                if self.direction == "NORTH":
+                    if (self.nBor - context.y) < 3:
+                        self.nBor = context.y
+                        self.leftTurns = self.rightTurns = 0
+                        self.direction = "EAST"
+                elif self.direction == "SOUTH":
+                    if (context.y - self.sBor) < 3:
+                        self.sBor = context.y
+                        self.leftTurns = self.rightTurns = 0
+                        self.direction = "WEST"
+                elif self.direction == "EAST":
+                    if (self.eBor - context.x) < 3:
+                        self.eBor = context.x
+                        self.leftTurns = self.rightTurns = 0
+                        self.direction = "SOUTH"
+                elif self.direction == "WEST":
+                    if (context.x - self.wBor) < 3:
+                        self.wBor = context.x
+                        self.leftTurns = self.rightTurns = 0
+                        self.direction = "NORTH"
+            self.innerSearch(context)
+            return self.direction
 
 
 class Overlord:
@@ -238,32 +314,39 @@ class Overlord:
 
     def add_map(self, map_id, summary):
         self.maps[map_id] = summary
-        self.deployed[map_id] = 0
+        self.deployed[map_id] = []
         self.ratio()
 
     def ratio(self):
         self.droneRatio = 6/len(self.maps)
 
     def action(self):
-         a = 0
-         if self.numDeployed != 6:
+         if self.numDeployed != 5:
             for mapped, deployed in self.deployed.items():
-                if deployed < self.droneRatio:
-                    self.deployed[mapped] += 1
+                if len(deployed) == 0:
                     self.currDrone+= 1
                     self.numDeployed += 1
+                    self.zerg[self.downRange[self.currDrone]].setRole("lead")
+                    self.deployed[mapped].append(self.downRange[self.currDrone])
                     return 'DEPLOY {} {}'.format(self.downRange[self.currDrone],
                                          mapped)
-         while a <= len(self.downRange)-1:
-            if self.zerg[self.downRange[a]].beam == 1:
-                x = self.downRange.pop(a)
-                self.returned.append(x)
-                return 'RETURN {}'.format(x)
-            a += 1
+               # if len(deployed) == 1:
+                #    self.currDrone += 1
+                 #   self.numDeployed += 1
+                  #  self.deployed[mapped].append(self.downRange[self.currDrone])
+                  #  return 'DEPLOY {} {}'.format(self.downRange[self.currDrone],
+                                        # mapped)
+
+         for mapped, deployed in self.deployed.items():
+            for drone in deployed:
+                if self.zerg[drone].beam == 1:
+                    self.zerg[drone].beam = 0
+                    return 'RETURN {}'.format(drone)
+
          #debug Statement
          print("returned", self.returned)
          return "NONE YET"
-         
+
         
             
 
