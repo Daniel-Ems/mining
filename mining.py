@@ -253,7 +253,7 @@ class Drone:
             return self.direction
 
         """ check to see if they collected a certain number of minerals """
-        if self.mined >= 45:
+        if self.mined >= 50:
             #Debug Statement
             print("MINE CAPACITY")
             if context.x == self.dropX and context.y == self.dropY:
