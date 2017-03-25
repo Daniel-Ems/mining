@@ -8,16 +8,15 @@ from time import sleep
 
 class Drone:
 
-    
     cardinal = ["NORTH", "EAST", "SOUTH", "WEST"]
-    cardinalIndex = {"NORTH":0, "EAST":1, "SOUTH":2, "WEST":3}
+    cardinalIndex = {"NORTH": 0, "EAST": 1, "SOUTH": 2, "WEST": 3}
     turnMath = {"right": 1, "left": 3, "aboutFace": 2}
 
     def __init__(self):
         self.stepCount = 0
         self.direction = "NONE"
         self.returnPath = deque([])
-        self.nBor = 0 
+        self.nBor = 0
         self.sBor = 1
         self.eBor = 0
         self.wBor = 1
@@ -38,12 +37,10 @@ class Drone:
         self.mapped = False
         self.tempDir = "NONE"
 
-
-    """ pops the new instructions from the deque """
     def getInstructions(self, context):
-        """ getInstructions will return the current instructions from a """ 
+        """ getInstructions will return the current instructions from a """
         """ deque """
-        if self.detour == False:
+        if self.detour is False:
             self.stepCount, self.direction = self.returnPath.popleft()
         if self.leftTurns == 0 and self.rightTurns == 0:
             if getattr(context, self.direction.lower()) == "*":
@@ -55,9 +52,7 @@ class Drone:
                 self.direction = self.makeTurn(context, "left")
                 self.leftTurns = self.rightTurns = 0
                 self.detour = False
-        
-        
-    
+
     def returnInstructions(self, context):
         """ Return instructions will map back the path the Drone must take """
         """ to the landing zone """
@@ -79,7 +74,7 @@ class Drone:
             if self.dropX > context.x:
                 self.returnPath.appendleft((sideways, "EAST"))
             elif self.dropX < context.x:
-                self.returnPath.appendleft((sideways, "WEST")) 
+                self.returnPath.appendleft((sideways, "WEST"))
             if self.dropY > context.y:
                 self.returnPath.appendleft((upDown, "NORTH"))
             elif self.dropY < context.y:
@@ -87,28 +82,27 @@ class Drone:
         self.headBack = True
         self.getInstructions(context)
 
-    """ This is the 'detour' method """ 
     def makeTurn(self, context, direction):
         """ makeTurn will return the direction that is either to the left """
         """ right, or to the back(aboutFace) of the drone """
         indx = Drone.cardinalIndex[self.direction]
         index = Drone.turnMath[direction]
-        return Drone.cardinal[(indx + index)%4]
-        
+        return Drone.cardinal[(indx + index) % 4]
+
     """ this checks every direction for mines """
     def mineCheck(self, context):
         """ mineCheck will check the Drone's immediate surroundings for """
-        """ minerals, if their are minerals, they are mined immediately """ 
+        """ minerals, if their are minerals, they are mined immediately """
         for items in Drone.cardinal:
-            if getattr(context,items.lower()) == "*":
+            if getattr(context, items.lower()) == "*":
                 self.mined += 1
                 return items
         return "NONE"
 
-
     def rightTurn(self, context):
         """ Left turn will move the drone right of it's current """
-        """ direction, the method will also update the drone's right counter """
+        """ direction, the method will also update the drone's right """
+        """ counter """
         right = self.makeTurn(context, "right")
         self.rightTurns += 1
         if getattr(context, right.lower()) in "#~Z":
@@ -120,7 +114,7 @@ class Drone:
         """ Left turn will move the drone left of it's current """
         """ direction, the method will also update the drone's left counter """
         left = self.makeTurn(context, "left")
-        if getattr(context,left.lower()) not in "#~Z":
+        if getattr(context, left.lower()) not in "#~Z":
             self.leftTurns += 1
             return left
         return "NONE"
@@ -128,9 +122,9 @@ class Drone:
     def setStart(self, context):
         """ This method sets the starting location for border searches """
         """ It obtains the x and y coordinates if the Drone encounters a """
-        """ wall and the x and y == 1 """ 
-        if getattr(context, self.direction.lower()) == "#":      
-            if context.x  == 1 or context.y == 1:
+        """ wall and the x and y == 1 """
+        if getattr(context, self.direction.lower()) == "#":
+            if context.x == 1 or context.y == 1:
                 self.startX = context.x
                 self.startY = context.y
                 self.startSearch = True
@@ -140,8 +134,8 @@ class Drone:
         """ keep track of the turns it has made to get back on track """
         if self.leftTurns == 0 and self.rightTurns == 0:
             if getattr(context, self.direction.lower()) in "#~Z":
-                if self.borderPatrol == False:                                
-                    self.detour == True
+                if self.borderPatrol is False:
+                    self.detour is True
                 if getattr(context, self.direction.lower()) == "Z":
                     self.zergImpact = True
                 self.direction = self.rightTurn(context)
@@ -149,11 +143,11 @@ class Drone:
         elif self.rightTurns >= self.leftTurns:
             left = self.leftTurn(context)
             if left != "NONE":
-                if self.borderPatrol == True:
+                if self.borderPatrol is True:
                     self.direction = left
                 else:
                     if self.direction == "NORTH":
-                        if ( context.x - self.wBor) > 0:
+                        if (context.x - self.wBor) > 0:
                             self.direction = left
                         else:
                             self.leftTurns -= 1
@@ -172,16 +166,14 @@ class Drone:
                             self.direction = left
                         else:
                             self.leftTurns -= 1
-                
 
             elif getattr(context, self.direction.lower()) in "#~Z":
                 if getattr(context, self.direction.lower()) == "Z":
                     self.zergImpact = True
                 self.direction = self.rightTurn(context)
 
-
         elif self.leftTurns > self.rightTurns:
-            if self.borderPatrol == True:
+            if self.borderPatrol is True:
                 self.direction = self.rightTurn(context)
                 self.leftTurns = self.rightTurns = 0
                 self.detour = False
@@ -223,10 +215,8 @@ class Drone:
                         self.leftTurns = self.rightTurns
 
     def move(self, context):
-        
 
-        """ if headBack is set, return to the landing zone """
-        if self.headBack == True:
+        if self.headBack is True:
             """ This section of the code will check to see if the Drone """
             """ has been called back by the overlord. If so, the Drone """
             """ will cease current methods and operations and return back """
@@ -236,12 +226,9 @@ class Drone:
                 return "CENTER"
             else:
                 self.home = 0
-                self.returnInstructions( context)
-                #Debug Statement
-                print("NOT AT LANDING YET", self.stepCount, self.direction)
+                self.returnInstructions(context)
             self.stepCount -= 1
             return self.direction
-
 
         mine = self.mineCheck(context)
         if mine != "NONE":
@@ -255,16 +242,13 @@ class Drone:
                 self.direction = "SOUTH"
             else:
                 self.direction = "WEST"
-            #Debug statement
             print(self.dropX, self.dropY)
 
-
-        if self.borderPatrol == True:
+        if self.borderPatrol is True:
             """ This section of the code controls the Drone's Border """
             """ search. This updates borders as they are discovered """
             """ sets the starting position, and identifies the drone """
             """ when it has arrived at it's starting point """
-            
             if self.direction == "NORTH":
                 if context.y > self.nBor:
                     self.nBor = context.y
@@ -272,17 +256,16 @@ class Drone:
                 if context.x > self.eBor:
                     self.eBor = context.x
 
-            if self.startSearch == False:
+            if self.startSearch is False:
                 self.setStart(context)
                 self.navigate(context)
                 return self.direction
-            
-            if self.startSearch == True:
+
+            if self.startSearch is True:
                 xDistance = context.x - self.startX
                 yDistance = context.y - self.startY
-                if  xDistance == 0 and yDistance == 0:
-                    #if xDistance >= 0 and yDistance >= 0:
-                     if self.rightTurns >= 4:
+                if xDistance == 0 and yDistance == 0:
+                    if self.rightTurns >= 4:
                         self.mapped = True
                         self.leftTurns = self.rightTurns = 0
                         self.borderPatrol = False
@@ -290,37 +273,16 @@ class Drone:
 
             self.navigate(context)
             return self.direction
-        
 
-        
-
-        """ check to see if they collected a certain number of minerals """
-        if self.mined >= 500:
-            #Debug Statement
-            print("MINE CAPACITY")
-            if context.x == self.dropX and context.y == self.dropY:
-                self.beam = 1
-                self.headBack = True
-                return "CENTER"
-            self.returnInstructions(context)
-            self.stepCount -= 1
-            return self.direction
-
-        #if (self.nBor + self.eBor + self.wBor + self.sBor) / 4 <= 3:
-         #   self.returnInstructions(context.x, context.y)
-         #  self.stepCount -= 1
-         # return self.direction
-
-        if self.headBack == False:
+        if self.headBack is False:
             """ This section of the code handles the inner loop of the """
             """ function. After the zergs have completed their border """
             """ search, and before they are called back by the Overlord """
-            """ they will begin to spiral from the outside in. """ 
-            """ as the Drone hits each previously discovered border """ 
+            """ they will begin to spiral from the outside in. """
+            """ as the Drone hits each previously discovered border """
             """ it will turn right, and then re-define the border """
             """ based off of it's current position """
-            #self.innerSearch(context)
-            if self.detour == False:
+            if self.detour is False:
                 if self.direction == "NORTH":
                     if (self.nBor - context.y) < 3:
                         self.nBor = context.y
@@ -356,7 +318,7 @@ class Overlord:
         self.numDeployed = 0
         self.returned = []
         self.ticksRemaining = total_ticks
-        self.returnDistance={}
+        self.returnDistance = {}
         for _ in range(6):
             z = Drone()
             self.zerg[id(z)] = z
@@ -394,50 +356,33 @@ class Overlord:
         distanceList.append(fourthDistance)
 
         return max(distanceList)
-            
-            
 
     def action(self):
         self.ticksRemaining -= 1
         if self.numDeployed != 5:
             for mapped, deployed in self.deployed.items():
                 if len(deployed) == 0:
-                    self.currDrone+= 1
+                    self.currDrone += 1
                     self.numDeployed += 1
-                    self.deployed[mapped].append(self.downRange[self.currDrone])
-                    return 'DEPLOY {} {}'.format(self.downRange[self.currDrone],
-                                         mapped)
-               # if len(deployed) == 1:
-                #    self.currDrone += 1
-                 #   self.numDeployed += 1
-                  #  self.deployed[mapped].append(self.downRange[self.currDrone])
-                  #  return 'DEPLOY {} {}'.format(self.downRange[self.currDrone],
-                                        # mapped)
-        
+                    self.deployed[mapped].append(
+                                                self.downRange[self.currDrone])
+                    return 'DEPLOY {} {}'.format(
+                                                self.downRange[self.currDrone],
+                                                mapped)
+
         for mapped, deployed in self.deployed.items():
             for drone in deployed:
-                if self.zerg[drone].mapped == False:
+                if self.zerg[drone].mapped is False:
                     returnDis = self.farthestCorner(self.zerg[drone])
                     self.returnDistance[drone] = returnDis
 
         for drone, distance in self.returnDistance.items():
             if distance >= self.ticksRemaining:
                 self.zerg[drone].headBack = True
-      
+
         for mapped, deployed in self.deployed.items():
             for drone in deployed:
                 if self.zerg[drone].beam == 1:
                     self.zerg[drone].beam = 0
                     return 'RETURN {}'.format(drone)
-
-        #debug Statement
-        print("returned", self.returned)
-        return "NONE YET"
-
-        
-            
-
-
-     
-
-
+        return "NONE"
