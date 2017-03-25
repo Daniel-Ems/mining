@@ -44,6 +44,7 @@ class Drone:
             self.stepCount, self.direction = self.returnPath.popleft()
         if self.leftTurns == 0 and self.rightTurns == 0:
             if getattr(context, self.direction.lower()) == "*":
+                self.detour = True
                 self.rightTurns += 1
                 self.direction = self.makeTurn(context, "right")
         if self.leftTurns < self.rightTurns:
@@ -59,6 +60,9 @@ class Drone:
         self.leftTurns = self.rightTurns = 0
         sideways = abs(self.dropX - context.x)
         upDown = abs(self.dropY - context.y)
+        """ The following if statement will identify the furthest corner """
+        """ of the map form the current location to calculate the longest """
+        """ possible path home """
         if self.dropX == context.x | self.dropY == context.y:
             if self.dropX == context.x:
                 if self.dropY > context.y:
@@ -133,6 +137,9 @@ class Drone:
         """ Navigate will check the drone's path for obstacles, and will """
         """ keep track of the turns it has made to get back on track """
         if self.leftTurns == 0 and self.rightTurns == 0:
+            """ if the number of left and right turns are equal, then the """
+            """ drone is on it's current course, if it encounters obstacles """
+            """ it moves right and the right counter is incremented"""
             if getattr(context, self.direction.lower()) in "#~Z":
                 if self.borderPatrol is False:
                     self.detour is True
@@ -141,6 +148,9 @@ class Drone:
                 self.direction = self.rightTurn(context)
 
         elif self.rightTurns >= self.leftTurns:
+            """ if the number of left turns is less than right, the drone """
+            """ must be sure that their is something on his left at all """
+            """ if there is not, the drone will turn left """
             left = self.leftTurn(context)
             if left != "NONE":
                 if self.borderPatrol is True:
@@ -173,6 +183,9 @@ class Drone:
                 self.direction = self.rightTurn(context)
 
         elif self.leftTurns > self.rightTurns:
+            """ if the number of left turns exceeds the number of rights """
+            """ then the drone has circumnavigated it's obstacle and should """
+            """ continue straight """
             if self.borderPatrol is True:
                 self.direction = self.rightTurn(context)
                 self.leftTurns = self.rightTurns = 0
@@ -224,6 +237,8 @@ class Drone:
             if context.x == self.dropX and context.y == self.dropY:
                 self.beam = 1
                 return "CENTER"
+            elif self.detour is True:
+                self.getInstructions(context)
             else:
                 self.home = 0
                 self.returnInstructions(context)
@@ -236,6 +251,8 @@ class Drone:
 
         """ set the drop location """
         if self.dropX == -1 and self.dropY == -1:
+            """ the drones landing coordinates are established the momement """
+            """ they touch down """
             self.dropX = context.x
             self.dropY = context.y
             if self.dropX > self.dropY:
@@ -330,7 +347,7 @@ class Overlord:
 
     def farthestCorner(self, zerg):
         """ This function will take the borders of the map the drone's """
-        """ identify, as well as their landing zones. The function """
+        """ identify, as well as their landing zones. The method determines """
         """ the distance from the corner furthest away from the LZ. """
         """ This is done to determine the longest possible path back """
         """ to the landing zone. When the number of ticks falls below """
@@ -339,21 +356,21 @@ class Overlord:
 
         lz = zerg.dropX + zerg.dropY
 
-        firstDistance = abs((zerg.nBor + zerg.eBor) - lz) + 5
+        neDistance = abs((zerg.nBor + zerg.eBor) - lz)
 
-        secondDistance = abs((zerg.wBor + zerg.nBor) - lz) + 5
+        nwDistance = abs((zerg.wBor + zerg.nBor) - lz)
 
-        thirdDistance = abs((zerg.sBor + zerg.eBor) - lz) + 5
+        seDistance = abs((zerg.sBor + zerg.eBor) - lz)
 
-        fourthDistance = abs((zerg.sBor + zerg.wBor) - lz) + 5
+        swDistance = abs((zerg.sBor + zerg.wBor) - lz)
 
-        distanceList.append(firstDistance)
+        distanceList.append(neDistance)
 
-        distanceList.append(secondDistance)
+        distanceList.append(nwDistance)
 
-        distanceList.append(thirdDistance)
+        distanceList.append(seDistance)
 
-        distanceList.append(fourthDistance)
+        distanceList.append(swDistance)
 
         return max(distanceList)
 
@@ -377,7 +394,7 @@ class Overlord:
                     self.returnDistance[drone] = returnDis
 
         for drone, distance in self.returnDistance.items():
-            if distance >= self.ticksRemaining:
+            if (distance + 15) >= self.ticksRemaining:
                 self.zerg[drone].headBack = True
 
         for mapped, deployed in self.deployed.items():
