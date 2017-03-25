@@ -23,7 +23,7 @@ class Map:
         self.data.append([ '#' for _ in range(X) ])
 
         self.mineral = []
-        for n in range(1,10):
+        for n in range(1,15):
             self.add_mineral(n)
 
         c = 0,0
