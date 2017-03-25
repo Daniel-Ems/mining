@@ -4,8 +4,11 @@
 from random import randint, choice
 from collections import deque
 from time import sleep
+
+
 class Drone:
 
+    
     cardinal = ["NORTH", "EAST", "SOUTH", "WEST"]
     cardinalIndex = {"NORTH":0, "EAST":1, "SOUTH":2, "WEST":3}
     turnMath = {"right": 1, "left": 3, "aboutFace": 2}
@@ -25,53 +28,64 @@ class Drone:
         self.home = 0
         self.beam = 0
         self.borderPatrol = True
-        self.getInstructions()
         self.startSearch = False
         self.rightTurns = 0
         self.leftTurns = 0
         self.current = "NONE"
         self.detour = False
-        self.zergImpact = False
         self.startX = 0
         self.startY = 0
         self.mapped = False
+        self.tempDir = "NONE"
 
 
     """ pops the new instructions from the deque """
-    def getInstructions(self):
+    def getInstructions(self, context):
         """ getInstructions will return the current instructions from a """ 
         """ deque """
-        if self.headBack == True:
-             self.stepCount, self.direction = self.returnPath.popleft()    
+        if self.detour == False:
+            self.stepCount, self.direction = self.returnPath.popleft()
+        if self.leftTurns == 0 and self.rightTurns == 0:
+            if getattr(context, self.direction.lower()) == "*":
+                self.rightTurns += 1
+                self.direction = self.makeTurn(context, "right")
+        if self.leftTurns < self.rightTurns:
+            left = self.makeTurn(context, "left")
+            if getattr(context, left.lower()) != "*":
+                self.direction = self.makeTurn(context, "left")
+                self.leftTurns = self.rightTurns = 0
+                self.detour = False
+        
+        
     
-    """ calculates the path for the drone to head go back to the landing zone """
-    def returnInstructions(self, x, y):
+    def returnInstructions(self, context):
         """ Return instructions will map back the path the Drone must take """
         """ to the landing zone """
-        sideways = abs(self.dropX - x)
-        upDown = abs(self.dropY - y)
-        if self.dropX == x | self.dropY == y:
-            if self.dropX == x:
-                if self.dropY > y:
+        self.leftTurns = self.rightTurns = 0
+        sideways = abs(self.dropX - context.x)
+        upDown = abs(self.dropY - context.y)
+        if self.dropX == context.x | self.dropY == context.y:
+            if self.dropX == context.x:
+                if self.dropY > context.y:
                     self.returnPath.appendleft((upDown, "NORTH"))
-                elif self.dropY < y:
+                elif self.dropY < context.y:
                     self.returnPath.appendleft((upDown, "SOUTH"))
-            elif self.dropY == y:
-                if self.dropX > x:
+            elif self.dropY == context.y:
+                if self.dropX > context.x:
                     self.returnPath.appendleft((sideways, "EAST"))
-                elif self.dropx < x:
+                elif self.dropx < context.x:
                     self.returnPath.appendleft((sideways, "WEST"))
         else:
-            if self.dropX > x:
+            if self.dropX > context.x:
                 self.returnPath.appendleft((sideways, "EAST"))
-            elif self.dropX < x:
+            elif self.dropX < context.x:
                 self.returnPath.appendleft((sideways, "WEST")) 
-            if self.dropY > y:
+            if self.dropY > context.y:
                 self.returnPath.appendleft((upDown, "NORTH"))
-            elif self.dropY < y:
+            elif self.dropY < context.y:
                 self.returnPath.appendleft((upDown, "SOUTH"))
         self.headBack = True
-        self.getInstructions()
+        self.getInstructions(context)
 
     """ This is the 'detour' method """ 
     def makeTurn(self, context, direction):
@@ -98,8 +112,6 @@ class Drone:
         right = self.makeTurn(context, "right")
         self.rightTurns += 1
         if getattr(context, right.lower()) in "#~Z":
-            if getattr(context,right.lower()) == "Z":
-                self.zergImpact == True
             right = self.makeTurn(context, "aboutFace")
             self.rightTurns += 1
         return right
@@ -109,10 +121,6 @@ class Drone:
         """ direction, the method will also update the drone's left counter """
         left = self.makeTurn(context, "left")
         if getattr(context,left.lower()) not in "#~Z":
-            if self.zergImpact == True:
-                self.leftTurns = self.rightTurns = 0
-                self.zergImpact = False
-                return left
             self.leftTurns += 1
             return left
         return "NONE"
@@ -127,11 +135,12 @@ class Drone:
                 self.startY = context.y
                 self.startSearch = True
 
-
     def navigate(self, context):
+        """ Navigate will check the drone's path for obstacles, and will """
+        """ keep track of the turns it has made to get back on track """
         if self.leftTurns == 0 and self.rightTurns == 0:
             if getattr(context, self.direction.lower()) in "#~Z":
-                if self.borderPatrol == False:
+                if self.borderPatrol == False:                                
                     self.detour == True
                 if getattr(context, self.direction.lower()) == "Z":
                     self.zergImpact = True
@@ -140,25 +149,103 @@ class Drone:
         elif self.rightTurns >= self.leftTurns:
             left = self.leftTurn(context)
             if left != "NONE":
-                self.direction = left
+                if self.borderPatrol == True:
+                    self.direction = left
+                else:
+                    if self.direction == "NORTH":
+                        if ( context.x - self.wBor) > 0:
+                            self.direction = left
+                        else:
+                            self.leftTurns -= 1
+                    elif self.direction == "SOUTH":
+                        if (self.eBor - context.x) > 0:
+                            self.direction = left
+                        else:
+                            self.leftTurns -= 1
+                    elif self.direction == "EAST":
+                        if (self.nBor - context.y) > 0:
+                            self.direction = left
+                        else:
+                            self.leftTurns -= 1
+                    elif self.direction == "WEST":
+                        if (context.y - self.sBor) > 0:
+                            self.direction = left
+                        else:
+                            self.leftTurns -= 1
+                
+
             elif getattr(context, self.direction.lower()) in "#~Z":
                 if getattr(context, self.direction.lower()) == "Z":
                     self.zergImpact = True
                 self.direction = self.rightTurn(context)
 
+
         elif self.leftTurns > self.rightTurns:
-            self.direction = self.rightTurn(context)
-            self.detour = False
-            self.rightTurns = 0
-            self.leftTurns = 0
-        
-        return self.direction
+            if self.borderPatrol == True:
+                self.direction = self.rightTurn(context)
+                self.leftTurns = self.rightTurns = 0
+                self.detour = False
+            else:
+                if self.direction == "NORTH":
+                    if (self.nBor - context.y) == 0:
+                        self.direction = self.rightTurn(context)
+                        self.detour = False
+                        self.leftTurns = 0
+                        self.rightTurns = 0
+                    else:
+                        self.leftTurns = self.rightTurns
+
+                elif self.direction == "SOUTH":
+                    if (context.y - self.sBor) == 0:
+                        self.direction = self.rightTurn(context)
+                        self.detour = False
+                        self.rightTurns = 0
+                        self.leftTurns = 0
+                    else:
+                        self.leftTurns = self.rightTurns
+
+                elif self.direction == "EAST":
+                    if (self.eBor - context.x) == 0:
+                        self.direction = self.rightTurn(context)
+                        self.detour = False
+                        self.rightTurns = 0
+                        self.leftTurns = 0
+                    else:
+                        self.leftTurns = self.rightTurns
+
+                elif self.direction == "WEST":
+                    if (context.x - self.wBor) == 0:
+                        self.direction = self.rightTurn(context)
+                        self.detour = False
+                        self.rightTurns = 0
+                        self.leftTurns = 0
+                    else:
+                        self.leftTurns = self.rightTurns
 
     def move(self, context):
-        if self.headBack == False:
-            mine = self.mineCheck(context)
-            if mine != "NONE":
-                return mine
+        
+
+        """ if headBack is set, return to the landing zone """
+        if self.headBack == True:
+            """ This section of the code will check to see if the Drone """
+            """ has been called back by the overlord. If so, the Drone """
+            """ will cease current methods and operations and return back """
+            """ to the landing zone on as straight of a path as possible """
+            if context.x == self.dropX and context.y == self.dropY:
+                self.beam = 1
+                return "CENTER"
+            else:
+                self.home = 0
+                self.returnInstructions( context)
+                #Debug Statement
+                print("NOT AT LANDING YET", self.stepCount, self.direction)
+            self.stepCount -= 1
+            return self.direction
+
+
+        mine = self.mineCheck(context)
+        if mine != "NONE":
+            return mine
 
         """ set the drop location """
         if self.dropX == -1 and self.dropY == -1:
@@ -205,24 +292,7 @@ class Drone:
             return self.direction
         
 
-        """ if headBack is set, return to the landing zone """
-        if self.headBack == True:
-            """ This section of the code will check to see if the Drone """
-            """ has been called back by the overlord. If so, the Drone """
-            """ will cease current methods and operations and return back """
-            """ to the landing zone on as straight of a path as possible """
-            if context.x == self.dropX and context.y == self.dropY:
-                print("AT LANDING ZONE")
-
-                self.beam = 1
-                return "CENTER"
-            else:
-                self.home = 0
-                self.returnInstructions(context.x, context.y)
-                #Debug Statement
-                print("NOT AT LANDING YET", self.stepCount, self.direction)
-            self.stepCount -= 1
-            return self.direction
+        
 
         """ check to see if they collected a certain number of minerals """
         if self.mined >= 500:
@@ -232,7 +302,7 @@ class Drone:
                 self.beam = 1
                 self.headBack = True
                 return "CENTER"
-            self.returnInstructions(context.x, context.y)
+            self.returnInstructions(context)
             self.stepCount -= 1
             return self.direction
 
@@ -307,13 +377,13 @@ class Overlord:
 
         lz = zerg.dropX + zerg.dropY
 
-        firstDistance = abs((zerg.nBor + zerg.eBor) - lz)
+        firstDistance = abs((zerg.nBor + zerg.eBor) - lz) + 5
 
-        secondDistance = abs((zerg.wBor + zerg.nBor) - lz)
+        secondDistance = abs((zerg.wBor + zerg.nBor) - lz) + 5
 
-        thirdDistance = abs((zerg.sBor + zerg.eBor) - lz)
+        thirdDistance = abs((zerg.sBor + zerg.eBor) - lz) + 5
 
-        fourthDistance = abs((zerg.sBor + zerg.wBor) - lz)
+        fourthDistance = abs((zerg.sBor + zerg.wBor) - lz) + 5
 
         distanceList.append(firstDistance)
 
